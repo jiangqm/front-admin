@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Layout, Menu, Button, Drawer, Typography, Space, Divider } from 'antd';
+import { Layout, Menu, Button, Drawer, Typography } from 'antd';
+import type { MenuProps } from 'antd';
 import {
   HomeOutlined,
   InfoCircleOutlined,
@@ -10,85 +11,111 @@ import {
   BookOutlined,
   MenuOutlined,
   CloseOutlined,
+  AppstoreOutlined,
+  MobileOutlined,
+  SkinOutlined,
+  UnorderedListOutlined,
+  FileTextOutlined,
+  FormOutlined,
+  TableOutlined,
 } from '@ant-design/icons';
 import { navigationItems } from '../router';
 
 const { Sider } = Layout;
-const { Title, Text } = Typography;
+const { Title } = Typography;
+
+// 图标映射函数
+const getIcon = (iconName?: string) => {
+  const iconMap = {
+    HomeOutlined: <HomeOutlined />,
+    InfoCircleOutlined: <InfoCircleOutlined />,
+    ContactsOutlined: <ContactsOutlined />,
+    UserOutlined: <UserOutlined />,
+    ShoppingOutlined: <ShoppingOutlined />,
+    BookOutlined: <BookOutlined />,
+    AppstoreOutlined: <AppstoreOutlined />,
+    MobileOutlined: <MobileOutlined />,
+    SkinOutlined: <SkinOutlined />,
+    UnorderedListOutlined: <UnorderedListOutlined />,
+    FileTextOutlined: <FileTextOutlined />,
+    FormOutlined: <FormOutlined />,
+    TableOutlined: <TableOutlined />,
+  };
+  return iconName ? iconMap[iconName as keyof typeof iconMap] : undefined;
+};
+
+// 递归转换导航项为 Ant Design Menu 项
+type MenuItem = Required<MenuProps>['items'][number];
+
+const transformNavigationItems = (items: typeof navigationItems): MenuItem[] => {
+  return items.map(item => ({
+    key: item.key,
+    icon: getIcon(item.icon),
+    label: item.label,
+    children: item.children ? transformNavigationItems(item.children) : undefined,
+  }));
+};
 
 // 使用 Ant Design 的侧边栏组件
-const AntdSidebar = () => {
+interface AntdSidebarProps {
+  onCollapsedChange?: (collapsed: boolean) => void;
+}
+
+const AntdSidebar: React.FC<AntdSidebarProps> = ({ onCollapsedChange }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
-  // 菜单项配置
-  const menuItems = [
-    {
-      key: '/',
-      icon: <HomeOutlined />,
-      label: '首页',
-    },
-    {
-      key: '/about',
-      icon: <InfoCircleOutlined />,
-      label: '关于我们',
-    },
-    {
-      key: '/contact',
-      icon: <ContactsOutlined />,
-      label: '联系我们',
-    },
-    {
-      type: 'divider',
-    },
-    {
-      key: 'dynamic-routes',
-      icon: <UserOutlined />,
-      label: '动态路由示例',
-      children: [
-        {
-          key: '/user/123',
-          icon: <UserOutlined />,
-          label: '用户详情 - 123',
-        },
-        {
-          key: '/user/456',
-          icon: <UserOutlined />,
-          label: '用户详情 - 456',
-        },
-        {
-          key: '/product/electronics/phone-001',
-          icon: <ShoppingOutlined />,
-          label: '电子产品示例',
-        },
-        {
-          key: '/product/clothing/shirt-202',
-          icon: <ShoppingOutlined />,
-          label: '服装产品示例',
-        },
-        {
-          key: '/blog',
-          icon: <BookOutlined />,
-          label: '博客列表',
-        },
-        {
-          key: '/blog/react-hooks-guide',
-          icon: <BookOutlined />,
-          label: 'React 指南文章',
-        },
-      ],
-    },
-  ];
+  // 处理折叠状态变化
+  const handleCollapsedChange = (newCollapsed: boolean) => {
+    setCollapsed(newCollapsed);
+    onCollapsedChange?.(newCollapsed);
+  };
+
+ 
+  const menuItems = transformNavigationItems(navigationItems);
+
+  // 根据 key 查找对应的路径
+  const findPathByKey = (items: typeof navigationItems, targetKey: string): string | null => {
+    for (const item of items) {
+      if (item.key === targetKey) {
+        return item.path;
+      }
+      if (item.children) {
+        const childPath = findPathByKey(item.children, targetKey);
+        if (childPath) return childPath;
+      }
+    }
+    return null;
+  };
+
+  // 根据路径查找对应的 key
+  const findKeyByPath = (items: typeof navigationItems, targetPath: string): string | null => {
+    for (const item of items) {
+      if (item.path === targetPath) {
+        return item.key;
+      }
+      if (item.children) {
+        const childKey = findKeyByPath(item.children, targetPath);
+        if (childKey) return childKey;
+      }
+    }
+    return null;
+  };
 
   // 处理菜单点击
   const handleMenuClick = ({ key }: { key: string }) => {
-    if (key.startsWith('/')) {
-      navigate(key);
+    const path = findPathByKey(navigationItems, key);
+    if (path) {
+      navigate(path);
       setMobileOpen(false);
     }
   };
+
+  // 获取当前选中的菜单项
+  const selectedKey = findKeyByPath(navigationItems, location.pathname);
+  const selectedKeys = selectedKey ? [selectedKey] : [];
 
   // 侧边栏内容
   const sidebarContent = (
@@ -102,7 +129,7 @@ const AntdSidebar = () => {
           <Button
             type="text"
             icon={collapsed ? <MenuOutlined /> : <CloseOutlined />}
-            onClick={() => setCollapsed(!collapsed)}
+            onClick={() => handleCollapsedChange(!collapsed)}
             className="lg:hidden"
           />
         </div>
@@ -112,27 +139,25 @@ const AntdSidebar = () => {
       <div className="flex-1 overflow-y-auto">
         <Menu
           mode="inline"
-          selectedKeys={[location.pathname]}
+          selectedKeys={selectedKeys}
           items={menuItems}
           onClick={handleMenuClick}
           className="border-r-0"
           style={{ height: '100%' }}
         />
       </div>
-
-      {/* 底部信息 */}
-      <div className="p-4 border-t border-gray-200">
-        <Space direction="vertical" size="small" className="w-full">
-          <Text type="secondary" className="text-xs">
-            路由特性
-          </Text>
-          <div className="text-xs text-gray-500 space-y-1">
-            <div>• 懒加载组件</div>
-            <div>• 动态路由参数</div>
-            <div>• 统一配置管理</div>
-            <div>• 代码分割优化</div>
-          </div>
-        </Space>
+      
+      {/* 折叠按钮 */}
+      <div className="p-2 border-t border-gray-200">
+        <Button
+          type="text"
+          icon={collapsed ? <MenuOutlined /> : <CloseOutlined />}
+          onClick={() => handleCollapsedChange(!collapsed)}
+          className="w-full"
+          size="small"
+        >
+          {!collapsed && '收起'}
+        </Button>
       </div>
     </div>
   );
@@ -144,12 +169,19 @@ const AntdSidebar = () => {
         trigger={null}
         collapsible
         collapsed={collapsed}
+        onCollapse={handleCollapsedChange}
         className="hidden lg:block"
         width={250}
         collapsedWidth={80}
         style={{
           background: '#fff',
           boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
+          height: '100vh',
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          zIndex: 1000,
         }}
       >
         {sidebarContent}
@@ -170,14 +202,6 @@ const AntdSidebar = () => {
         {sidebarContent}
       </Drawer>
 
-      {/* 移动端菜单按钮 */}
-      <Button
-        type="primary"
-        icon={<MenuOutlined />}
-        onClick={() => setMobileOpen(true)}
-        className="fixed top-4 left-4 z-50 lg:hidden"
-        size="large"
-      />
     </>
   );
 };
